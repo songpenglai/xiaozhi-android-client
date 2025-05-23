@@ -1,16 +1,31 @@
 allprojects {
     repositories {
+        maven { setUrl ("https://jitpack.io") }
+        maven { setUrl ("https://mirrors.tencent.com/nexus/repository/maven-public/") }
+        maven { setUrl ("https://mirrors.tencent.com/nexus/repository/gradle-plugins/") }
         google()
         mavenCentral()
     }
+//    subprojects {
+//        afterEvaluate { project ->
+//            if (project.hasProperty('android')) {
+//                project.android {
+//                    if (namespace == null) {
+//                        namespace project.group
+//                    }
+//                }
+//            }
+//        }
+//    }
 }
 
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+//    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+//    project.layout.buildDirectory.value(newSubprojectBuildDir)
+
 }
 subprojects {
     project.evaluationDependsOn(":app")

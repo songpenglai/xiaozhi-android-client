@@ -1,23 +1,23 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'dart:math' as math;
-import 'dart:math';
+import 'dart:async';
 import 'dart:io';
-import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
+import 'dart:math';
+
 import 'package:ai_assistant/models/conversation.dart';
+import 'package:ai_assistant/models/dify_config.dart';
 import 'package:ai_assistant/models/message.dart';
 import 'package:ai_assistant/models/xiaozhi_config.dart';
-import 'package:ai_assistant/models/dify_config.dart';
-import 'package:ai_assistant/providers/conversation_provider.dart';
 import 'package:ai_assistant/providers/config_provider.dart';
+import 'package:ai_assistant/providers/conversation_provider.dart';
+import 'package:ai_assistant/screens/voice_call_screen.dart';
 import 'package:ai_assistant/services/dify_service.dart';
 import 'package:ai_assistant/services/xiaozhi_service.dart';
 import 'package:ai_assistant/widgets/message_bubble.dart';
-import 'package:ai_assistant/screens/voice_call_screen.dart';
-import 'dart:convert';
-import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:image/image.dart' as img;
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
@@ -48,6 +48,8 @@ class _ChatScreenState extends State<ChatScreen> {
   double _minWaveHeight = 5.0;
   double _maxWaveHeight = 30.0;
   final Random _random = Random();
+
+  var imageId = "";
 
   @override
   void initState() {
@@ -234,6 +236,8 @@ class _ChatScreenState extends State<ChatScreen> {
         event.type == XiaozhiServiceEventType.disconnected) {
       // 当连接状态发生变化时，更新UI
       setState(() {});
+    } else if (event.type == XiaozhiServiceEventType.imageId) {
+      imageId = event.data as String;
     }
   }
 
@@ -761,22 +765,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-                if (widget.conversation.type == ConversationType.dify &&
-                    !hasText)
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add_circle_outline,
-                      color: Color(0xFF9CA3AF), // 使用紫色，与小智的麦克风按钮风格一致
-                      size: 24,
-                    ),
-                    onPressed: _showImagePickerOptions,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    constraints: const BoxConstraints(),
-                    splashRadius: 22,
+                // if (widget.conversation.type == ConversationType.dify && !hasText)
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: Color(0xFF9CA3AF), // 使用紫色，与小智的麦克风按钮风格一致
+                    size: 24,
                   ),
+                  onPressed: _showImagePickerOptions,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  constraints: const BoxConstraints(),
+                  splashRadius: 22,
+                ),
                 _buildSendButton(hasText),
-                if (widget.conversation.type == ConversationType.xiaozhi &&
-                    !hasText)
+                if (widget.conversation.type == ConversationType.xiaozhi && !hasText)
                   IconButton(
                     icon: const Icon(
                       Icons.mic,
@@ -784,6 +786,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       size: 24,
                     ),
                     onPressed: () {
+                      _showCustomSnackbar("切换到识图模式");
+                      _xiaozhiService?.switchMode("001");
                       setState(() {
                         _isVoiceInputMode = true;
                       });
@@ -954,6 +958,8 @@ class _ChatScreenState extends State<ChatScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(25),
                 onTap: () {
+                  _showCustomSnackbar("切换到聊天模式");
+                  _xiaozhiService?.switchMode("000");
                   // 如果正在录音，先取消录音
                   if (_isRecording) {
                     _cancelRecording();
@@ -1206,7 +1212,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         // 发送消息
-        await _xiaozhiService!.sendTextMessage(message);
+        await _xiaozhiService!.sendTextMessage(message, imageId);
+        imageId = "";
       }
     } catch (e) {
       print('聊天屏幕: 发送消息错误: $e');
@@ -1418,7 +1425,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       onTap: () {
                         Navigator.of(context).pop();
-                        _pickImage(true);
+                        _pickImage(true, true);
                       },
                     ),
                   ),
@@ -1491,7 +1498,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       onTap: () {
                         Navigator.of(context).pop();
-                        _pickImage(false);
+                        _pickImage(false, true);
                       },
                     ),
                   ),
@@ -1505,23 +1512,25 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _pickImage(bool fromGallery) async {
-    if (widget.conversation.type != ConversationType.dify) {
-      _showCustomSnackbar('图片上传功能仅适用于Dify对话');
-      return;
-    }
+  Future<void> _pickImage(bool fromGallery, bool isXiaozhi) async {
+    // if (widget.conversation.type != ConversationType.dify) {
+    //   _showCustomSnackbar('图片上传功能仅适用于Dify对话');
+    //   return;
+    // }
 
     try {
       setState(() {
         _isLoading = true;
       });
 
-      if (_difyService == null) {
-        await _initDifyService();
-      }
+      if (!isXiaozhi) {
+        if (_difyService == null) {
+          await _initDifyService();
+        }
 
-      if (_difyService == null) {
-        throw Exception("未设置Dify配置，请先在设置中配置Dify API");
+        if (_difyService == null) {
+          throw Exception("未设置Dify配置，请先在设置中配置Dify API");
+        }
       }
 
       final ImagePicker picker = ImagePicker();
@@ -1554,7 +1563,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 复制图片到永久存储
       final File imageFile = File(pickedFile.path);
-      await imageFile.copy(localPath);
+
+      // 压缩图片
+      const targetSize = 100 * 1024; // 100KB
+      final fileSize = await imageFile.length();
+      print('图片大小: $fileSize');
+      if (fileSize > targetSize) {
+        var bytes = await imageFile.readAsBytes();
+
+        print('开始压缩: ${bytes.lengthInBytes}');
+        final compressImg = await _compressWithQuality(bytes, targetSize);
+        print('完成压缩: ${compressImg.lengthInBytes}');
+
+        // 写入压缩后的图片
+        await File(localPath).writeAsBytes(compressImg);
+      } else {
+        await imageFile.copy(localPath);
+      }
 
       print('图片已保存到永久存储: $localPath');
 
@@ -1577,9 +1602,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _scrollToBottom();
 
+      if (isXiaozhi) {
+        await _xiaozhiService!.uploadFile(File(localPath), sessionId);
+
+        return;
+      }
+
       // 上传图片到Dify API
       final response = await _difyService!.uploadFile(File(localPath));
-
       if (response.containsKey('id')) {
         final fileId = response['id'];
         final messageContent = "";
@@ -1630,5 +1660,25 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollToBottom();
     }
+  }
+
+  Future<Uint8List> _compressWithQuality(Uint8List bytes, int targetSize) async {
+    final image = img.decodeImage(bytes);
+    if (image == null) {
+      throw Exception('无法解码图片');
+    }
+    int quality = 80;
+    Uint8List? compressedImage;
+    int currentSize;
+    do {
+      // 先尝试80质量
+      compressedImage = img.encodeJpg(image, quality:quality);
+      currentSize = compressedImage.lengthInBytes;
+
+      print('压缩中: currentSize= $currentSize， quality=$quality, targetSize=$targetSize');
+      quality = quality-10;
+    } while(currentSize > targetSize && quality > 0);
+
+    return compressedImage;
   }
 }

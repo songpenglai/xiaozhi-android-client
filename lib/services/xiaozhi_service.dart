@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
+
+import 'package:ai_assistant/utils/file_md5_calculator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_sound/flutter_sound.dart';
-import '../services/xiaozhi_websocket_manager.dart';
-import '../utils/device_util.dart';
-import '../utils/audio_util.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../services/xiaozhi_websocket_manager.dart';
+import '../utils/audio_util.dart';
 
 /// 小智服务事件类型
 enum XiaozhiServiceEventType {
@@ -20,6 +20,7 @@ enum XiaozhiServiceEventType {
   voiceCallStart,
   voiceCallEnd,
   userMessage,
+  imageId,
 }
 
 /// 小智服务事件
@@ -225,7 +226,7 @@ class XiaozhiService {
   }
 
   /// 发送文本消息
-  Future<String> sendTextMessage(String message) async {
+  Future<String> sendTextMessage(String message, String imageId) async {
     if (!_isConnected && _webSocketManager == null) {
       await connect();
     }
@@ -265,7 +266,11 @@ class XiaozhiService {
 
       // 发送文本请求
       print('$TAG: 发送文本请求: $message');
-      _webSocketManager!.sendTextRequest(message);
+      if (imageId.isEmpty) {
+        _webSocketManager!.sendTextRequest(message);
+      } else {
+        _webSocketManager!.sendTextRequestWithImage(message, imageId);
+      }
 
       // 设置超时，15秒比10秒更宽松一些
       final timeoutTimer = Timer(const Duration(seconds: 15), () {
@@ -555,7 +560,8 @@ class XiaozhiService {
       case XiaozhiEventType.binaryMessage:
         // 处理二进制音频数据 - 简化直接播放
         final audioData = event.data as List<int>;
-        AudioUtil.playOpusData(Uint8List.fromList(audioData));
+        // AudioUtil.playOpusData(Uint8List.fromList(audioData));
+        AudioUtil.playPcmData(Uint8List.fromList(audioData));
         break;
 
       case XiaozhiEventType.error:
@@ -653,6 +659,24 @@ class XiaozhiService {
             );
           }
           break;
+        case 'upload':
+          final String state = jsonData['state'] ?? '';
+          final String id = jsonData['id'] ?? '';
+          print('$TAG: 收到上传图片消息: state = $state, id =$id');
+          if (state=='complete') {
+            _dispatchEvent(
+              XiaozhiServiceEvent(
+                XiaozhiServiceEventType.imageId,id)
+            );
+          }
+          break;
+        case 'switch':
+          final String state = jsonData['state'] ?? '';
+          final String id = jsonData['id'] ?? '';
+          print('$TAG: 收到模式切换结果消息: state = $state, id =$id');
+          if (state=='complete') {
+          }
+          break;
 
         default:
           // 对于其他类型的消息，直接忽略
@@ -671,7 +695,7 @@ class XiaozhiService {
         'type': 'start',
         'mode': 'auto',
         'audio_params': {
-          'format': 'opus',
+          'format': 'pcm',
           'sample_rate': 16000,
           'channels': 1,
           'frame_duration': 60,
@@ -806,4 +830,80 @@ class XiaozhiService {
 
   /// 判断是否正在说话
   bool get _isSpeaking => _audioStreamSubscription != null;
+
+  // 上传文件到websocket
+  Future<void> uploadFile(
+      File file, sessionId) async {
+    try {
+      final start = {
+        "type": "upload",
+        "state": "start",
+        "mime": "image/jpeg",
+        "md5": FileMd5Calculator.calculateFileSync(file),
+        "session_id": _sessionId
+      };
+      _webSocketManager?.sendMessage(jsonEncode(start));
+
+      await sendImageFromPath(file);
+
+      final end = {
+        "type": "upload",
+        "state": "stop",
+        "session_id": _sessionId
+      };
+      _webSocketManager?.sendMessage(jsonEncode(end));
+    } catch (e) {
+      print('XiaozhiService 文件上传错误: $e');
+    }
+  }
+
+  // 从文件路径发送图片
+  Future<void> sendImageFromPath(File file) async {
+    if (!_isConnected) {
+      throw StateError('WebSocket is not connected');
+    }
+
+    try {
+
+      final bytes = await file.readAsBytes();
+      print('XiaozhiService 开始上传图片: length = ${bytes.length}, $file.path');
+      await _sendImageBytes(bytes);
+    } catch (e) {
+      print('Error sending image: $e');
+      rethrow;
+    }
+  }
+  // 私有方法：实际发送图片字节
+  Future<void> _sendImageBytes(Uint8List bytes) async {
+    // 发送图片数据
+    // _channel.sink.add(bytes);
+    _webSocketManager?.sendBinaryMessage(bytes);
+    // 或者发送包含图片元数据的JSON消息
+    final message = json.encode({
+      'type': 'image',
+      'format': 'jpeg', // 或 'png' 等
+      'size': bytes.length,
+      'data': base64Encode(bytes), // 如果服务器需要Base64编码
+    });
+
+    // 如果需要发送JSON消息而不是原始字节
+    // _channel.sink.add(message);
+  }
+
+  // 上传文件到websocket
+  Future<void> switchMode(String mode) async {
+    try {
+      final modeJson = {
+        "type": "switch",
+        "state": "start",
+        "mode": mode,
+        "session_id": _sessionId
+      };
+      final msg = jsonEncode(modeJson);
+      _webSocketManager?.sendMessage(msg);
+      print('XiaozhiService switchMode: $msg');
+    } catch (e) {
+      print('XiaozhiService 文件上传错误: $e');
+    }
+  }
 }

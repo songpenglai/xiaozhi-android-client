@@ -188,7 +188,7 @@ class XiaozhiWebSocketManager {
       "version": 1,
       "transport": "websocket",
       "audio_params": {
-        "format": "opus",
+        "format": "pcm",
         "sample_rate": 16000,
         "channels": 1,
         "frame_duration": 60,
@@ -242,6 +242,30 @@ class XiaozhiWebSocketManager {
         "state": "detect",
         "text": text,
         "source": "text",
+      };
+
+      print('$TAG: 发送文本请求: ${jsonEncode(jsonMessage)}');
+      sendMessage(jsonEncode(jsonMessage));
+    } catch (e) {
+      print('$TAG: 发送文本请求失败: $e');
+    }
+  }
+
+  /// 发送文本请求
+  void sendTextRequestWithImage(String text, String imageId) {
+    if (!isConnected) {
+      print('$TAG: 发送失败，连接未建立');
+      return;
+    }
+
+    try {
+      // 构造消息格式，与Java实现保持一致
+      final jsonMessage = {
+        "type": "listen",
+        "state": "detect",
+        "text": text,
+        "source": "text",
+        "ids": [imageId]
       };
 
       print('$TAG: 发送文本请求: ${jsonEncode(jsonMessage)}');

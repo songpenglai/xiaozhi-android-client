@@ -182,6 +182,27 @@ class AudioUtil {
     }
   }
 
+  /// 播放Pcm音频数据
+  static Future<void> playPcmData(Uint8List pcmData) async {
+    try {
+      // 如果播放器未初始化，先初始化
+      if (!_isPlayerInitialized || _pcmPlayer == null) {
+        await initPlayer();
+      }
+
+      // 直接发送到播放器
+      if (_pcmPlayer != null) {
+        await _pcmPlayer!.feed(pcmData);
+      }
+    } catch (e) {
+      print('$TAG: 放播失败: $e');
+
+      // 简单重置并重新初始化
+      await stopPlaying();
+      await initPlayer();
+    }
+  }
+
   /// 停止播放
   static Future<void> stopPlaying() async {
     if (_pcmPlayer != null) {
@@ -244,10 +265,11 @@ class AudioUtil {
         stream.listen(
           (data) async {
             if (data.isNotEmpty && data.length % 2 == 0) {
-              final opusData = await encodeToOpus(data);
-              if (opusData != null) {
-                _audioStreamController.add(opusData);
-              }
+              // final opusData = await encodeToOpus(data);
+              // if (opusData != null) {
+              //   _audioStreamController.add(opusData);
+              // }
+              _audioStreamController.add(data);
             }
           },
           onError: (error) {

@@ -743,7 +743,7 @@ class XiaozhiService {
   }
 
   /// 开始监听（按住说话模式）
-  Future<void> startListening({String mode = 'manual'}) async {
+  Future<void> startListening(String imageId, {String mode = 'manual'}) async {
     if (!_isConnected || _webSocketManager == null) {
       await connect();
     }
@@ -759,14 +759,27 @@ class XiaozhiService {
       await AudioUtil.startRecording();
 
       // 发送开始监听命令
-      final message = {
-        'session_id': _sessionId,
-        'type': 'listen',
-        'state': 'start',
-        'mode': mode,
-      };
+      var message;
+      if (imageId.isNotEmpty) {
+        message =  {
+          'session_id': _sessionId,
+          'type': 'listen',
+          'state': 'start',
+          'mode': mode,
+          'ids':[imageId]
+        };
+      } else {
+        message =  {
+          'session_id': _sessionId,
+          'type': 'listen',
+          'state': 'start',
+          'mode': mode,
+        };
+      }
+
       _webSocketManager?.sendMessage(jsonEncode(message));
-      print('$TAG: 已发送开始监听消息 (按住说话)');
+      print('$TAG: 已发送开始监听消息 (按住说话), msg is ${jsonEncode(message)}');
+
 
       // 设置音频流订阅
       _audioStreamSubscription = AudioUtil.audioStream.listen((opusData) {

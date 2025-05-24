@@ -1057,7 +1057,7 @@ class _ChatScreenState extends State<ChatScreen> {
       HapticFeedback.mediumImpact();
 
       // 开始录音
-      await _xiaozhiService!.startListening();
+      await _xiaozhiService!.startListening(imageId, mode:'manual');
     } catch (e) {
       print('开始录音失败: $e');
       _showCustomSnackbar('无法开始录音: ${e.toString()}');

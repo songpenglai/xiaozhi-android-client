@@ -11,10 +11,10 @@ pluginManagement {
 
     repositories {
 
-        gradlePluginPortal()
-        maven { setUrl ("https://jitpack.io") }
         maven { setUrl ("https://mirrors.tencent.com/nexus/repository/maven-public/") }
         maven { setUrl ("https://mirrors.tencent.com/nexus/repository/gradle-plugins/") }
+        gradlePluginPortal()
+        maven { setUrl ("https://jitpack.io") }
         google()
         mavenCentral()
     }

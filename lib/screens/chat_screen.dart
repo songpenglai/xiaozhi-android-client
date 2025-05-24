@@ -50,6 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final Random _random = Random();
 
   var imageId = "";
+  var modeType = 0;
 
   @override
   void initState() {
@@ -298,6 +299,47 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.refresh, color: Colors.black, size: 24),
               tooltip: '开始新对话',
               onPressed: _resetConversation,
+            ),
+          if (widget.conversation.type == ConversationType.xiaozhi)
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () {
+                    // TODO: 实现设置功能
+                    if (modeType == 0) {
+                      modeType = 1;
+                      _xiaozhiService?.switchMode("001");
+                      _showCustomSnackbar("切换到识图模式");
+                    } else {
+                      modeType = 0;
+                      _showCustomSnackbar("切换到聊天模式");
+                      _xiaozhiService?.switchMode("000");
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.settings, color: Colors.black, size: 16),
+                    ),
+                  ),
+                ),
+              ),
             ),
           if (widget.conversation.type == ConversationType.xiaozhi)
             Container(
@@ -786,8 +828,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       size: 24,
                     ),
                     onPressed: () {
-                      _showCustomSnackbar("切换到识图模式");
-                      _xiaozhiService?.switchMode("001");
                       setState(() {
                         _isVoiceInputMode = true;
                       });
@@ -958,8 +998,6 @@ class _ChatScreenState extends State<ChatScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(25),
                 onTap: () {
-                  _showCustomSnackbar("切换到聊天模式");
-                  _xiaozhiService?.switchMode("000");
                   // 如果正在录音，先取消录音
                   if (_isRecording) {
                     _cancelRecording();
